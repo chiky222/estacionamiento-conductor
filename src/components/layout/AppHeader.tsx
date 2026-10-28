@@ -23,8 +23,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-30 border-b border-line bg-surface-glass backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4">
         <Link href="/" aria-label="Inicio" className="mr-auto">
-          <CommonLogo height={20} className="hidden sm:block" />
-          <CommonLogo height={16} className="sm:hidden" />
+          <CommonLogo height={32} />
         </Link>
         <nav className="flex items-center gap-1" aria-label="Principal">
           {LINKS.map((l) => (

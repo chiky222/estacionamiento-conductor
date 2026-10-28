@@ -13,7 +13,7 @@ const sans = Figtree({ subsets: ["latin"], weight: ["400", "500", "600", "700"],
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-jetbrains" });
 
 export const metadata: Metadata = {
-  title: "ESTACIONARTE · Encontrá dónde estacionar",
+  title: "LIBRE · Encontrá dónde estacionar",
   description: "Buscá estacionamientos con lugar, elegí tu cochera en el plano y reservá pagando la seña o el total.",
 };
 
