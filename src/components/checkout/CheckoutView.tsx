@@ -54,7 +54,7 @@ export function CheckoutView() {
   const { usuario, cargando: cargandoSesion } = useUserSession();
   const estId = r.seleccion?.estacionamientoId ?? null;
   const plazaId = r.seleccion?.plazaId ?? null;
-  const { data: est } = useCarga(estId ? () => estacionamientosService.detalle(estId, r.vehiculo, r.desde) : null, [estId, r.vehiculo, r.desde]);
+  const { data: est } = useCarga(estId ? () => estacionamientosService.detalle(estId, r.vehiculo, r.desde, r.hasta) : null, [estId, r.vehiculo, r.desde, r.hasta]);
   const { data: medios } = useCarga(estId ? () => pagosService.medios(estId) : null, [estId]);
   const { cot, error: errCot } = useCotizacion(estId, plazaId, r.vehiculo, r.desde, r.hasta);
   // Una clave por intento de compra: si se toca "Pagar" dos veces o se corta la red, el back no duplica la reserva.

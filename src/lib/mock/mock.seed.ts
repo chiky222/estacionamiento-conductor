@@ -121,6 +121,8 @@ export function estacionamientosDeEjemplo(): EstacionamientoMock[] {
   const HOY = isoFecha(hoy());
   const central = datosDeEjemplo();
   central.configuracion.senaPct = 20;
+  // En la demo el Galpón Central permite ceder lugares de abonados; A-10 es del usuario demo (ver mock.galpon-central).
+  central.configuracion.subalquiler = { habilitado: true, pctAbonado: 50 };
 
   return [
     {

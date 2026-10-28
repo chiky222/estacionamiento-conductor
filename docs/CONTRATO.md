@@ -82,6 +82,7 @@ Detalle con el plano para elegir lugar.
 | --- | --- |
 | `vehiculo` | Para calcular `estado` y `precioDesde` |
 | `desde` | ISO de llegada: las tarifas del plano se calculan para ese momento (reglas horarias y eventos). Sin valor, ahora |
+| `hasta` | ISO de salida. Los lugares de abonados cedidos en **todo** `desde`-`hasta` vuelven `estado: "libre"` con `deAbonado: true` (ver "Subalquiler de abonos"). Sin valor, `desde` + 1 h |
 
 Respuesta: `EstacionamientoDetalle` = `EstacionamientoResumen` + `telefono`, `toleranciaMin`, `reservaMaxHoras` y `plano`:
 
@@ -122,13 +123,14 @@ Respuesta `Cotizacion`:
   "total": 6000,        // costoEntre(tarifa, tarifaEn(llegada), llegada, llegada + minutos)
   "senaPct": 20,
   "sena": 1200,         // senaDeReserva(...) redondeada a $10
-  "saldo": 4800         // total − seña
+  "saldo": 4800,        // total − seña
+  "cedidoHasta": "2026-10-28T22:00:00.000Z"  // solo en un lugar de abonado cedido: fin de la cesión
 }
 ```
 
 Cálculo (igual que el tablero): precio vigente **a la hora de llegada** (`tarifaEn`), por fracciones con tope diario (`costoEstadia`), seña = `senaPct` % redondeado a $10 (`senaDeReserva`).
 
-Errores: 400 `HORARIO_INVALIDO` (menos de 30 min, más de `reservaMaxHoras`, llegada pasada o a más de 24 h), 409 `ESTACIONAMIENTO_CERRADO`, 409 `VEHICULO_NO_ENTRA`, 404 `NOT_FOUND`.
+Errores: 400 `HORARIO_INVALIDO` (menos de 30 min, más de `reservaMaxHoras`, llegada pasada o a más de 24 h), 409 `ESTACIONAMIENTO_CERRADO`, 409 `VEHICULO_NO_ENTRA`, 409 `FUERA_DE_CESION` (lugar de abonado y la estadía no entra en una cesión), 409 `PLAZA_NO_DISPONIBLE`, 404 `NOT_FOUND`. `POST /api/reservas` repite la misma validación.
 
 ## Sesión del conductor
 
@@ -142,7 +144,7 @@ Passport local + Google, JWT en cookie httpOnly firmada, rol `conductor` (distin
 | GET | `/api/sesion/google?volver=/checkout` | — | Redirige a Google y, al volver, a `volver` (solo rutas internas) |
 | POST | `/api/sesion/logout` | — | `{ ok: true }` |
 
-`UsuarioSesion = { id, nombre, email, rol: "conductor", patente? }`. `patente` = la última que usó (para completar el checkout). Nunca devolver hash de contraseña ni tokens.
+`UsuarioSesion = { id, nombre, email, rol: "conductor", patente?, abonado? }`. `abonado: true` si tiene un abono (`plaza.abono.usuarioId`) en un estacionamiento con el subalquiler habilitado: muestra "Mi abono". `patente` = la última que usó (para completar el checkout). Nunca devolver hash de contraseña ni tokens.
 
 ## Reservas (`onlyLogged`, rol conductor)
 
@@ -302,6 +304,26 @@ Una reserva de la app **es** una reserva del tablero:
 - Si el gestor libera la plaza (`POST /api/plazas/:id/liberar`) o vence: la reserva pasa a `cancelada` o `vencida`.
 - El scanner de la entrada (`Estacionamiento-scanner`) lee el QR con `reserva.codigo` y llama a la llegada.
 
+## Subalquiler de abonos (`onlyLogged`, rol conductor)
+
+El abono de una plaza del tablero se vincula a la cuenta con `plaza.abono.usuarioId` (el gestor lo asigna). Solo aparecen los abonos de estacionamientos con `configuracion.subalquiler.habilitado`.
+
+| Método | Ruta | Body | Respuesta |
+| --- | --- | --- | --- |
+| GET | `/api/abonos/mios` | — | `MiAbono[]`: plaza, vencimiento, precio, `credito`, `pctAbonado` y `cesiones` (`CesionAbono`: `desde`/`hasta` ISO, `estado`, `reservas`, `cobrado`, `ganado`) |
+| POST | `/api/abonos/:estacionamientoId/:plazaId/cesiones` | `{ desde, hasta }` (ISO, mismo día, que no haya terminado) | `MiAbono` actualizado. 400 `CESION_INVALIDA`, 409 `CESION_SUPERPUESTA`, 409 `SUBALQUILER_DESHABILITADO`, 404 si el abono no es suyo |
+| DELETE | `/api/abonos/:estacionamientoId/:plazaId/cesiones/:cesionId` | — | `MiAbono` actualizado. 409 `CESION_CON_RESERVAS` (tiene reservas vigentes o algo cobrado), 409 `PLAZA_CEDIDA` (en uso en el tablero) |
+
+En el back la cesión se guarda como en el tablero (`plaza.abono.cesiones[]` con `fecha` y minutos del día); la API del conductor la expone en ISO.
+
+**Reservas sobre un lugar cedido:**
+
+- Disponible si una cesión cubre toda la estadía (mismo día), no hay otra reserva de la app vigente que se pise y, si la franja ya empezó, el abonado está afuera (`reservada`) y nadie usa la plaza (`cedida`).
+- La reserva guarda `cesionId` y **no** cambia la plaza del tablero (sigue `reservada` para el abonado) ni escribe `plaza.sena`.
+- Al aprobar el pago: `abono.credito += pctAbonado % de lo pagado` (redondeo a $10) y `cesion.cobrado += lo pagado`. Movimiento `cobro` "… · lugar cedido".
+- Al cancelar con reembolso: se recalcula sobre lo retenido (la seña); el crédito y `cobrado` bajan en consecuencia.
+- Al llegar (scanner o tablero), el back ingresa el vehículo en la plaza cedida como en `POST /api/plazas/:id/ingreso` del tablero y deja `plaza.sena` = lo pagado online, así el cobro de salida lo descuenta. Al cobrar la salida, la parte del abonado se calcula sobre el total y se le resta lo que ya se le acreditó por esta reserva (para no contarlo dos veces). Las dos API simuladas son independientes, así que esto hoy no se ve en el front.
+
 ## Tiempo real (Socket.io)
 
 Hoy el front refresca cada 20-30 s (`useCarga` con `cadaMs`). Con Socket.io:
@@ -313,7 +335,7 @@ Hoy el front refresca cada 20-30 s (`useCarga` con `cadaMs`). Con Socket.io:
 
 ## Códigos de error nuevos
 
-`PLAZA_NO_DISPONIBLE` 409 · `SOLD_OUT` 409 · `ESTACIONAMIENTO_CERRADO` 409 · `HORARIO_INVALIDO` 400 · `MEDIO_PAGO_INVALIDO` 400 · `PAGO_RECHAZADO` 409 · `PAGO_YA_PROCESADO` 409 · `RESERVA_NO_CANCELABLE` 409 · `RESERVA_VENCIDA` 409. Más los del tablero que también se usan acá: `INVALID_ARGUMENT`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `PATENTE_INVALIDA`, `VEHICULO_NO_ENTRA`, `INTERNAL_ERROR`.
+`PLAZA_NO_DISPONIBLE` 409 · `SOLD_OUT` 409 · `ESTACIONAMIENTO_CERRADO` 409 · `HORARIO_INVALIDO` 400 · `MEDIO_PAGO_INVALIDO` 400 · `PAGO_RECHAZADO` 409 · `PAGO_YA_PROCESADO` 409 · `RESERVA_NO_CANCELABLE` 409 · `RESERVA_VENCIDA` 409 · `FUERA_DE_CESION` 409 · `SUBALQUILER_DESHABILITADO` 409 · `CESION_INVALIDA` 400 · `CESION_SUPERPUESTA` 409 · `CESION_CON_RESERVAS` 409 · `PLAZA_CEDIDA` 409. Más los del tablero que también se usan acá: `INVALID_ARGUMENT`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `PATENTE_INVALIDA`, `VEHICULO_NO_ENTRA`, `INTERNAL_ERROR`.
 
 ## Variables de entorno nuevas del back
 

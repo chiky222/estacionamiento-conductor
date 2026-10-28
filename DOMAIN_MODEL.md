@@ -14,7 +14,9 @@ Tipos en `src/lib/conductor.types.ts`; las entidades del plano (galpón, piso, s
 | Reserva | Lugar reservado por un conductor | `codigo`, `plazaId`, `patente`, `vehiculo`, `desde`, `hasta`, `modalidad` (sena, total), `total`, `sena`, `pagado`, `saldo`, `estado`, `pago`, `retenidaHasta`, `reembolso` |
 | MedioPago | Medio habilitado, resuelto por una pasarela | `id`, `pasarela`, `flujo` (redireccion, tarjeta, qr) |
 | Pago | Intento de pago de una reserva | `reservaId`, `medioId`, `pasarela`, `estado` (pendiente, aprobado, rechazado), `monto`, `redirectUrl` |
-| UsuarioSesion | Conductor logueado | `nombre`, `email`, `rol: conductor`, `patente` (la última usada) |
+| UsuarioSesion | Conductor logueado | `nombre`, `email`, `rol: conductor`, `patente` (la última usada), `abonado` (tiene abono donde se puede ceder) |
+| MiAbono | Abono mensual del conductor | `estacionamiento`, `plazaId`, `plazaEtiqueta`, `vence`, `precio`, `credito`, `pctAbonado`, `cesiones` |
+| CesionAbono | Franja en que cede su lugar | `desde`, `hasta` (ISO, mismo día), `estado` (proxima, en_curso, terminada), `reservas`, `cobrado`, `ganado` |
 
 ## Reglas
 
@@ -37,6 +39,17 @@ Lo pagado online queda en `plaza.sena` del tablero, así el cobro de salida lo d
 **Retención:** al crear la reserva la plaza queda reservada 10 minutos mientras paga. Si no se aprueba el pago a tiempo, la reserva vence y la plaza se libera.
 
 **Tolerancia:** el lugar se guarda `toleranciaMin` después de la hora de llegada; después la reserva vence.
+
+## Subalquiler de abonos ("Mi abono")
+
+Lo habilita el gestor (`configuracion.subalquiler` del tablero; ver su DOMAIN_MODEL). Deshabilitado, no aparece nada.
+
+- **Ceder:** el abonado elige día (hoy a 7 días) y horario. Franjas de un solo día, sin pisarse y que no hayan terminado.
+- **Quién lo ve libre:** en el plano, un lugar de abonado aparece libre (con una marca chica de abono) solo si una cesión cubre **todo** el horario buscado (`desde`-`hasta`), el abonado no está adentro si la franja ya empezó y no hay otra reserva de la app que se pise. Si cambia el horario y deja de cubrirlo, el lugar se suelta.
+- **Reservar:** igual que cualquier lugar. La cotización trae `cedidoHasta` y el resumen avisa que es de un abonado y que hay que salir antes de esa hora. Cotización y `POST /api/reservas` validan la franja (409 `FUERA_DE_CESION`).
+- **No toca la plaza del abonado:** la reserva queda en la cesión (`cesionId`), sin cambiar el estado de la plaza ni guardar `plaza.sena`.
+- **Crédito del abonado:** `pctAbonado` % de lo efectivamente cobrado. Al aprobar el pago suma su parte de lo pagado; si se cancela con reembolso, queda solo su parte de lo retenido (la seña). El saldo que se cobra al salir lo suma el tablero (ver `cobro`).
+- **Quitar una franja:** solo si no tiene reservas ni nada cobrado (409 `CESION_CON_RESERVAS`).
 
 ## Estados de una reserva
 

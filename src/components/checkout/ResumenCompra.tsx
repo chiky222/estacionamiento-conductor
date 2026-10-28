@@ -52,6 +52,7 @@ export function ResumenCompra({ est, cot, vehiculo, modalidad, children }: Props
         {fila("Salida", `${horaDe(cot.hasta)} · ${duracion(cot.minutos)}`)}
         {fila("Vehículo", claseVehiculo(vehiculo).label)}
         {fila("Tolerancia", `${est.toleranciaMin} min`)}
+        {cot.cedidoHasta && fila("Lugar de un abonado", `libre hasta ${horaDe(cot.cedidoHasta)}`)}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -69,7 +70,9 @@ export function ResumenCompra({ est, cot, vehiculo, modalidad, children }: Props
       </div>
       {children}
       <CommonHint className="mt-0">
-        Si te quedás más tiempo, la diferencia se cobra al salir con la tarifa del lugar.{" "}
+        {cot.cedidoHasta
+          ? `El abonado de este lugar vuelve a las ${horaDe(cot.cedidoHasta)}: tenés que salir antes. `
+          : "Si te quedás más tiempo, la diferencia se cobra al salir con la tarifa del lugar. "}
         {cot.sena > 0
           ? modalidad === "total"
             ? `Si cancelás antes de llegar te devolvemos todo menos la seña (${ars(cot.sena)}).`

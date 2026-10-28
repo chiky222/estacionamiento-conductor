@@ -99,6 +99,17 @@ export function datosDeEjemplo(): DatosTablero {
         if (i === 0) p.tipo = "pmr";
         if (i < 16) {
           p.abono = { vence: isoFecha(sumarDias(HOY, i === 3 ? -6 : i === 11 ? -2 : 5 + i * 2)), precio: 120000 };
+          // Lugares cedidos (subalquiler): A-07 está cedido hoy y A-10 es del usuario de la app del conductor.
+          if (i === 6) p.abono.cesiones = [{ id: "c-a07-hoy", fecha: isoFecha(HOY), desde: 480, hasta: 1439 }];
+          if (i === 9)
+            Object.assign(p.abono, {
+              usuarioId: "u-demo",
+              credito: 8400,
+              cesiones: [
+                { id: "c-a10-ayer", fecha: isoFecha(sumarDias(HOY, -1)), desde: 540, hasta: 1080, cobrado: 16800 },
+                { id: "c-a10-man", fecha: isoFecha(sumarDias(HOY, 1)), desde: 540, hasta: 1080 },
+              ],
+            });
           p.cliente = nombres[i];
           p.patente = patenteAzar(r, false);
           p.vehiculo = "auto";

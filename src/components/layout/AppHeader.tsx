@@ -13,6 +13,7 @@ const LINKS: { href: string; label: string; icon: NombreIcono }[] = [
   { href: "/", label: "Buscar", icon: "mapa" },
   { href: "/reservas", label: "Mis reservas", icon: "ticket" },
 ];
+const LINK_ABONO: (typeof LINKS)[number] = { href: "/abono", label: "Mi abono", icon: "abono" };
 
 /** Barra superior: logo, navegación y sesión. En el celular la navegación pasa a íconos. */
 export function AppHeader() {
@@ -26,7 +27,8 @@ export function AppHeader() {
           <CommonLogo height={32} />
         </Link>
         <nav className="flex items-center gap-1" aria-label="Principal">
-          {LINKS.map((l) => (
+          {/* "Mi abono" solo para quien alquila por mes donde el gestor permite ceder el lugar. */}
+          {[...LINKS, ...(usuario?.abonado ? [LINK_ABONO] : [])].map((l) => (
             <Link
               key={l.href}
               href={l.href}

@@ -5,6 +5,7 @@
  */
 import type { ClaseVehiculo, Momento, Plaza, Sector } from "@/lib/types";
 import type {
+  CesionAbono,
   Cotizacion,
   EstacionamientoDetalle,
   EstacionamientoResumen,
@@ -14,19 +15,22 @@ import type {
   PlazaPublica,
   Reserva,
   TarifaSector,
+  MiAbono,
   Ubicacion,
   UsuarioSesion,
 } from "@/lib/conductor.types";
 import { ApiError } from "@/lib/errors";
 import { CLASES_VEHICULO } from "@/lib/constants";
 import { hhmm, isoFecha } from "@/lib/format";
+import { cesionQueCubre, cesionSuperpuesta, parteAbonado, subalquilerDe, subalquilerHabilitado } from "@/lib/subalquiler";
 import { etiquetaPlaza, parseIdPlaza, plazaVacia, recorrerPlazas, vehiculosPermitidos } from "@/lib/plano";
 import { costoEntre, eventosActivos, senaDeReserva, tarifaDeSector, tarifaEn } from "@/lib/tarifas";
 import { normalizarPatente } from "@/lib/patente";
 import { distanciaM, estadoDisponibilidad } from "@/lib/conductor";
 import { CENTRO_DEMO, estacionamientosDeEjemplo, type EstacionamientoMock } from "@/lib/mock/mock.seed";
 
-const CLAVE = "conductor-mock-v1";
+// v2: datos con subalquiler de abonos (cesiones de ejemplo en el Galpón Central).
+const CLAVE = "conductor-mock-v2";
 const LATENCIA_MS = 220;
 /** Minutos que se retiene el lugar mientras se completa un pago externo. */
 const RETENCION_MIN = 10;
@@ -38,7 +42,11 @@ const MEDIOS_PAGO: MedioPago[] = [
   { id: "modo", pasarela: "modo", nombre: "MODO", descripcion: "Pagá con QR desde la app de tu banco", flujo: "qr" },
 ];
 
-type ReservaMock = Reserva & { usuarioId: string };
+/**
+ * `cesionId`: reserva sobre el lugar cedido de un abonado. `cobradoCesion` y `creditoAbonado`: lo que ya se
+ * sumó por ella a la cesión y al crédito del abonado (para corregirlo si se cancela).
+ */
+type ReservaMock = Reserva & { usuarioId: string; cesionId?: string; cobradoCesion?: number; creditoAbonado?: number };
 /** Plaza del tablero con la reserva de la app que la ocupa (el back la vincula igual). */
 type PlazaApp = Plaza & { reservaId?: string };
 type PagoMock = Pago;
@@ -84,6 +92,42 @@ const codigoCorto = () => Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVW
 
 const momentoDe = (d: Date): Momento => ({ fecha: isoFecha(d), dow: d.getDay(), minuto: d.getHours() * 60 + d.getMinutes() });
 
+/** ISO de un minuto del día de una fecha local (las cesiones se guardan como en el tablero). */
+const isoDe = (fecha: string, minuto: number) => new Date(new Date(fecha + "T00:00:00").getTime() + minuto * 60000).toISOString();
+
+/** Reservas de la app que todavía ocupan el lugar en su horario. */
+const RESERVA_VIGENTE: Reserva["estado"][] = ["pendiente_pago", "confirmada", "en_curso"];
+
+/** Si otra reserva de la app sobre la misma plaza se pisa con el horario. */
+function reservaSuperpuesta(estId: string, plazaId: string, desde: Date, hasta: Date) {
+  return cargar().reservas.some(
+    (r) =>
+      r.estacionamiento.id === estId &&
+      r.plazaId === plazaId &&
+      RESERVA_VIGENTE.includes(actualizar(r).estado) &&
+      new Date(r.desde).getTime() < hasta.getTime() &&
+      desde.getTime() < new Date(r.hasta).getTime(),
+  );
+}
+
+/**
+ * Cesión del abonado que deja reservar la plaza de `desde` a `hasta`: tiene que cubrir la estadía entera
+ * (el mismo día), el lugar no puede estar en uso ahora por el abonado ni por otro, y no se puede pisar con
+ * otra reserva de la app.
+ */
+function cesionParaReservar(e: EstacionamientoMock, p: Plaza | undefined, desde: Date, hasta: Date) {
+  if (!p?.abono || !subalquilerHabilitado(e.datos.configuracion) || p.estado === "bloqueada") return undefined;
+  const md = momentoDe(desde);
+  const fin = Math.round((hasta.getTime() - new Date(md.fecha + "T00:00:00").getTime()) / 60000);
+  const c = cesionQueCubre(p, md.fecha, md.minuto, fin);
+  if (!c) return undefined;
+  // Si la franja ya empezó, el abonado tiene que estar afuera (y nadie más adentro).
+  const yaEmpezo = desde.getTime() <= Date.now();
+  if (p.cedida || (yaEmpezo && p.estado !== "reservada")) return undefined;
+  if (reservaSuperpuesta(e.meta.id, p.id, desde, hasta)) return undefined;
+  return c;
+}
+
 function buscarEst(id: string) {
   const e = cargar().estacionamientos.find((x) => x.meta.id === id);
   if (!e) throw err(404, "NOT_FOUND");
@@ -111,9 +155,11 @@ function resumen(e: EstacionamientoMock, vehiculo: ClaseVehiculo, cerca?: Ubicac
     const permitidos = vehiculosPermitidos(s);
     recorrerPlazas(s, d.plazas, (p) => {
       if (p.estado === "bloqueada") return;
+      // Un lugar de abonado cedido ahora cuenta como libre.
+      const libre = p.estado === "libre" || !!cesionParaReservar(e, d.plazas[p.id], ahora, new Date(ahora.getTime() + 30 * 60000));
       permitidos.forEach((v) => {
         disp[v].total++;
-        if (p.estado === "libre") disp[v].libres++;
+        if (libre) disp[v].libres++;
       });
     });
   });
@@ -141,11 +187,18 @@ function resumen(e: EstacionamientoMock, vehiculo: ClaseVehiculo, cerca?: Ubicac
   };
 }
 
-/** Plaza vista desde afuera: sin patente, cliente ni horarios. */
-function plazasPublicas(e: EstacionamientoMock) {
+/**
+ * Plaza vista desde afuera: sin patente, cliente ni horarios. Los lugares de abonados cedidos en todo el
+ * horario buscado (`desde`-`hasta`) se muestran libres, con la marca `deAbonado`.
+ */
+function plazasPublicas(e: EstacionamientoMock, desde: Date, hasta: Date) {
   const out: Record<string, PlazaPublica> = {};
   e.datos.sectores.forEach((s) =>
     recorrerPlazas(s, e.datos.plazas, (p) => {
+      if (cesionParaReservar(e, e.datos.plazas[p.id], desde, hasta)) {
+        out[p.id] = { id: p.id, sectorId: p.sectorId, fila: p.fila, columna: p.columna, tipo: p.tipo, estado: "libre", deAbonado: true };
+        return;
+      }
       out[p.id] = {
         id: p.id,
         sectorId: p.sectorId,
@@ -181,11 +234,18 @@ function validarPedido(e: EstacionamientoMock, b: PedidoCotizacion) {
   const s = e.datos.sectores.find((x) => x.id === sectorId);
   if (!s || fila >= s.rows || columna >= s.cols) throw err(404, "NOT_FOUND");
   if (!vehiculosPermitidos(s).includes(b.vehiculo)) throw err(409, "VEHICULO_NO_ENTRA");
-  return { s, desde, hasta, minutos };
+  // Lugar de un abonado: solo se puede reservar dentro de lo que cedió.
+  const p = e.datos.plazas[b.plazaId];
+  let cesion: ReturnType<typeof cesionParaReservar>;
+  if (p?.abono) {
+    cesion = cesionParaReservar(e, p, desde, hasta);
+    if (!cesion) throw err(409, subalquilerHabilitado(e.datos.configuracion) && p.abono.cesiones?.length ? "FUERA_DE_CESION" : "PLAZA_NO_DISPONIBLE");
+  }
+  return { s, desde, hasta, minutos, cesion };
 }
 
-function cotizar(e: EstacionamientoMock, b: PedidoCotizacion): Cotizacion & { sector: Sector } {
-  const { s, desde, minutos } = validarPedido(e, b);
+function cotizar(e: EstacionamientoMock, b: PedidoCotizacion): Cotizacion & { sector: Sector; cesionId?: string } {
+  const { s, desde, minutos, cesion } = validarPedido(e, b);
   const d = e.datos;
   const m = momentoDe(desde);
   // El precio se toma en la hora de llegada, igual que el tablero lo fija al ingresar.
@@ -205,6 +265,7 @@ function cotizar(e: EstacionamientoMock, b: PedidoCotizacion): Cotizacion & { se
     senaPct: d.configuracion.senaPct,
     sena,
     saldo: total - sena,
+    ...(cesion ? { cesionId: cesion.id, cedidoHasta: isoDe(cesion.fecha, cesion.hasta) } : {}),
   };
 }
 
@@ -216,6 +277,8 @@ function usuarioActual() {
 
 /** Ocupa la plaza en el tablero del gestor como una reserva más (estado "reservada"). */
 function retenerPlaza(e: EstacionamientoMock, r: ReservaMock) {
+  // En un lugar cedido la plaza sigue siendo del abonado: la reserva vive en la cesión, no en la plaza.
+  if (r.cesionId) return;
   const d = e.datos;
   const { sectorId, fila, columna } = parseIdPlaza(r.plazaId);
   const s = d.sectores.find((x) => x.id === sectorId)!;
@@ -238,9 +301,26 @@ function aprobar(r: ReservaMock, monto: number) {
   r.saldo = Math.max(0, r.total - monto);
   delete r.retenidaHasta;
   const p = e.datos.plazas[r.plazaId];
-  if (p) p.sena = monto;
+  if (r.cesionId) acreditarAbonado(e, r, monto);
+  else if (p) p.sena = monto;
   const ahora = momentoDe(new Date());
-  e.datos.movimientos.unshift({ id: nuevoId("m"), minuto: ahora.minuto, tipo: "cobro", detalle: `${r.modalidad === "total" ? "Pago online" : "Seña online"} · ${r.patente} · ${r.plazaEtiqueta}`, monto });
+  const detalle = `${r.modalidad === "total" ? "Pago online" : "Seña online"} · ${r.patente} · ${r.plazaEtiqueta}${r.cesionId ? " · lugar cedido" : ""}`;
+  e.datos.movimientos.unshift({ id: nuevoId("m"), minuto: ahora.minuto, tipo: "cobro", detalle, monto });
+}
+
+/**
+ * Deja la parte del abonado según lo que el estacionamiento se queda de una reserva en su lugar cedido
+ * (`cobrado`): su % va a crédito. Se llama al aprobar el pago y otra vez si se cancela con reembolso.
+ */
+function acreditarAbonado(e: EstacionamientoMock, r: ReservaMock, cobrado: number) {
+  const p = e.datos.plazas[r.plazaId];
+  const cesion = p?.abono?.cesiones?.find((c) => c.id === r.cesionId);
+  if (!p?.abono || !cesion) return;
+  const nuevo = parteAbonado(cobrado, subalquilerDe(e.datos.configuracion).pctAbonado);
+  p.abono.credito = (p.abono.credito ?? 0) + nuevo - (r.creditoAbonado ?? 0);
+  cesion.cobrado = (cesion.cobrado ?? 0) + cobrado - (r.cobradoCesion ?? 0);
+  r.creditoAbonado = nuevo;
+  r.cobradoCesion = cobrado;
 }
 
 /** Estados que dependen del reloj: retención vencida, reserva en curso o terminada. */
@@ -269,12 +349,63 @@ function cobrar(r: ReservaMock, medio: MedioPago, monto: number, tokenTarjeta?: 
   return pago;
 }
 
+/* ====== abonos del conductor (subalquiler) ====== */
+
+/** Plazas con abono del usuario en estacionamientos que permiten ceder el lugar. */
+function abonosDe(usuarioId: string) {
+  const out: { e: EstacionamientoMock; s: Sector; p: Plaza }[] = [];
+  cargar().estacionamientos.forEach((e) => {
+    if (!subalquilerHabilitado(e.datos.configuracion)) return;
+    e.datos.sectores.forEach((s) => recorrerPlazas(s, e.datos.plazas, (p) => p.abono?.usuarioId === usuarioId && out.push({ e, s, p: e.datos.plazas[p.id] })));
+  });
+  return out;
+}
+
+const conAbonado = (u: UsuarioSesion | null) => (u ? { ...u, abonado: abonosDe(u.id).length > 0 } : null);
+
+function miAbono({ e, s, p }: { e: EstacionamientoMock; s: Sector; p: Plaza }): MiAbono {
+  const pct = subalquilerDe(e.datos.configuracion).pctAbonado;
+  const ahora = Date.now();
+  const cesiones: CesionAbono[] = (p.abono!.cesiones ?? [])
+    .map((c) => {
+      const desde = isoDe(c.fecha, c.desde);
+      const hasta = isoDe(c.fecha, c.hasta);
+      const reservas = cargar().reservas.filter((r) => r.cesionId === c.id && r.estado !== "cancelada" && r.estado !== "vencida").length;
+      const estado = new Date(hasta).getTime() <= ahora ? "terminada" : new Date(desde).getTime() <= ahora ? "en_curso" : "proxima";
+      return { id: c.id, desde, hasta, estado, reservas, cobrado: c.cobrado ?? 0, ganado: parteAbonado(c.cobrado ?? 0, pct) } as CesionAbono;
+    })
+    .sort((a, b) => a.desde.localeCompare(b.desde));
+  return {
+    estacionamiento: { id: e.meta.id, nombre: e.meta.nombre, direccion: e.meta.direccion },
+    plazaId: p.id,
+    plazaEtiqueta: etiquetaPlaza(s, p.fila, p.columna),
+    sectorNombre: s.nombre,
+    pisoNombre: e.datos.pisos.find((x) => x.id === s.pisoId)?.nombre ?? "",
+    vence: p.abono!.vence,
+    precio: p.abono!.precio,
+    credito: p.abono!.credito ?? 0,
+    pctAbonado: pct,
+    cesiones,
+  };
+}
+
+/** El abono del usuario logueado en esa plaza (404 si no es suyo; 409 si el gestor no permite ceder). */
+function abonoPropio(estId: string, plazaId: string) {
+  const u = usuarioActual();
+  const e = buscarEst(estId);
+  const p = e.datos.plazas[plazaId];
+  if (!p?.abono || p.abono.usuarioId !== u.id) throw err(404, "NOT_FOUND");
+  if (!subalquilerHabilitado(e.datos.configuracion)) throw err(409, "SUBALQUILER_DESHABILITADO");
+  const s = e.datos.sectores.find((x) => x.id === p.sectorId)!;
+  return { e, s, p };
+}
+
 type Body = Record<string, unknown>;
 type Ruta = { metodo: string; patron: RegExp; h: (params: string[], body: Body, q: URLSearchParams, headers: Record<string, string>) => unknown };
 
 const rutas: Ruta[] = [
   // Sesión
-  { metodo: "GET", patron: /^\/api\/sesion\/actual$/, h: () => cargar().usuario },
+  { metodo: "GET", patron: /^\/api\/sesion\/actual$/, h: () => conAbonado(cargar().usuario) },
   {
     metodo: "POST",
     patron: /^\/api\/sesion\/(login|registro|google-demo)$/,
@@ -283,7 +414,7 @@ const rutas: Ruta[] = [
       if (!/^\S+@\S+\.\S+$/.test(email)) throw err(400, "INVALID_ARGUMENT");
       const nombre = String(b.nombre || email.split("@")[0]);
       cargar().usuario = { id: "u-demo", nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1), email, rol: "conductor", patente: cargar().usuario?.patente };
-      return cargar().usuario;
+      return conAbonado(cargar().usuario);
     },
   },
   {
@@ -318,6 +449,7 @@ const rutas: Ruta[] = [
       const e = buscarEst(id);
       const vehiculo = (q.get("vehiculo") ?? "auto") as ClaseVehiculo;
       const desde = q.get("desde") ? new Date(q.get("desde")!) : new Date();
+      const hasta = q.get("hasta") ? new Date(q.get("hasta")!) : new Date(desde.getTime() + 60 * 60000);
       const det: EstacionamientoDetalle = {
         ...resumen(e, vehiculo, CENTRO_DEMO),
         telefono: e.meta.telefono,
@@ -328,7 +460,7 @@ const rutas: Ruta[] = [
           pisos: e.datos.pisos,
           sectores: e.datos.sectores,
           objetos: e.datos.objetos,
-          plazas: plazasPublicas(e),
+          plazas: plazasPublicas(e, desde, hasta),
           tarifas: tarifasEn(e, momentoDe(desde)),
         },
       };
@@ -340,7 +472,7 @@ const rutas: Ruta[] = [
     patron: /^\/api\/publico\/estacionamientos\/([^/]+)\/cotizacion$/,
     h: ([id], b) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { sector, ...c } = cotizar(buscarEst(id), b as unknown as PedidoCotizacion);
+      const { sector, cesionId, ...c } = cotizar(buscarEst(id), b as unknown as PedidoCotizacion);
       return c;
     },
   },
@@ -427,6 +559,7 @@ const rutas: Ruta[] = [
         estado: "pendiente_pago",
         retenidaHasta: new Date(Date.now() + RETENCION_MIN * 60000).toISOString(),
         creadaEn: new Date().toISOString(),
+        ...(c.cesionId ? { cesionId: c.cesionId } : {}),
       };
       retenerPlaza(e, r);
       d.reservas.unshift(r);
@@ -473,9 +606,48 @@ const rutas: Ruta[] = [
       const cancelable = r.estado === "pendiente_pago" || (r.estado === "confirmada" && new Date(r.desde).getTime() > Date.now());
       if (!cancelable) throw err(409, "RESERVA_NO_CANCELABLE");
       r.reembolso = r.estado === "confirmada" ? Math.max(0, r.pagado - r.sena) : 0;
+      // En un lugar cedido, al abonado le queda su parte de lo que no se devuelve (la seña retenida).
+      if (r.cesionId && r.estado === "confirmada") acreditarAbonado(buscarEst(r.estacionamiento.id), r, r.pagado - r.reembolso);
       r.estado = "cancelada";
       liberarPlaza(buscarEst(r.estacionamiento.id), r);
       return r;
+    },
+  },
+
+  // Mi abono: ceder el lugar en los horarios que no se usa
+  { metodo: "GET", patron: /^\/api\/abonos\/mios$/, h: () => abonosDe(usuarioActual().id).map(miAbono) },
+  {
+    metodo: "POST",
+    patron: /^\/api\/abonos\/([^/]+)\/([^/]+)\/cesiones$/,
+    h: ([estId, plazaId], b) => {
+      const a = abonoPropio(estId, plazaId);
+      const desde = new Date(String(b.desde));
+      const hasta = new Date(String(b.hasta));
+      const md = momentoDe(desde);
+      // Una franja es de un solo día (como en el tablero) y no puede haber terminado.
+      const fin = Math.round((hasta.getTime() - new Date(md.fecha + "T00:00:00").getTime()) / 60000);
+      if (Number.isNaN(fin) || fin <= md.minuto || fin > 1440 || hasta.getTime() <= Date.now()) throw err(400, "CESION_INVALIDA");
+      const abono = a.p.abono!;
+      abono.cesiones ??= [];
+      if (cesionSuperpuesta(abono.cesiones, md.fecha, md.minuto, fin)) throw err(409, "CESION_SUPERPUESTA");
+      abono.cesiones.push({ id: nuevoId("c"), fecha: md.fecha, desde: md.minuto, hasta: fin });
+      return miAbono(a);
+    },
+  },
+  {
+    metodo: "DELETE",
+    patron: /^\/api\/abonos\/([^/]+)\/([^/]+)\/cesiones\/([^/]+)$/,
+    h: ([estId, plazaId, cesionId]) => {
+      const a = abonoPropio(estId, plazaId);
+      const abono = a.p.abono!;
+      const cesion = abono.cesiones?.find((c) => c.id === cesionId);
+      if (!cesion) throw err(404, "NOT_FOUND");
+      // Si alguien ya reservó, pagó o está usando el lugar en esa franja, el abonado no la puede retirar.
+      const reservada = cargar().reservas.some((r) => r.cesionId === cesionId && RESERVA_VIGENTE.includes(actualizar(r).estado));
+      if (reservada || (cesion.cobrado ?? 0) > 0) throw err(409, "CESION_CON_RESERVAS");
+      if (a.p.cedida?.cesionId === cesionId) throw err(409, "PLAZA_CEDIDA");
+      abono.cesiones = abono.cesiones!.filter((c) => c.id !== cesionId);
+      return miAbono(a);
     },
   },
 

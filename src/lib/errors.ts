@@ -32,6 +32,13 @@ export const MENSAJES_ERROR: Record<string, string> = {
   PAGO_YA_PROCESADO: "Este pago ya se procesó.",
   RESERVA_NO_CANCELABLE: "Esta reserva ya no se puede cancelar.",
   RESERVA_VENCIDA: "El tiempo para pagar venció y el lugar se liberó.",
+  // Subalquiler de abonos
+  SUBALQUILER_DESHABILITADO: "Este estacionamiento no permite ceder el lugar del abono.",
+  CESION_INVALIDA: "Revisá el día y el horario: el fin tiene que ser después del inicio y en el mismo día.",
+  CESION_SUPERPUESTA: "Ya cediste tu lugar en parte de ese horario.",
+  CESION_CON_RESERVAS: "Alguien ya reservó tu lugar en ese horario: no se puede quitar.",
+  PLAZA_CEDIDA: "Tu lugar lo está usando otro vehículo durante la cesión.",
+  FUERA_DE_CESION: "Ese lugar es de un abonado y está libre en otro horario: acortá la estadía o elegí otro lugar.",
   INTERNAL_ERROR: "Algo salió mal. Probá de nuevo.",
 };
 

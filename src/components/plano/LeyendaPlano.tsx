@@ -17,6 +17,12 @@ export function LeyendaPlano() {
       {item(<span className={cn(caja, "border-line-strong bg-surface-sunken")} />, "Ocupado")}
       {item(<span className={cn(caja, "border-blocked bg-[repeating-linear-gradient(45deg,var(--surface-sunken)_0_3px,var(--line)_3px_6px)]")} />, "No disponible")}
       {item(<span className={cn(caja, "border-dashed border-line-strong bg-surface-sunken opacity-60")} />, "No entra tu vehículo")}
+      {item(
+        <span className="grid size-5 place-items-center rounded-full bg-amber text-on-amber">
+          <CommonIcon name="abono" size={12} strokeWidth={2.5} />
+        </span>,
+        "Lugar de un abonado, libre en tu horario",
+      )}
     </div>
   );
 }

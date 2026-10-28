@@ -57,6 +57,8 @@ export interface PlazaPublica {
   tipo: TipoPlaza;
   /** Solo si está ocupada, para dibujar el vehículo en el plano. */
   vehiculo?: ClaseVehiculo;
+  /** Lugar de un abonado que lo cedió en el horario buscado (subalquiler): se reserva igual que uno libre. */
+  deAbonado?: boolean;
 }
 
 /** Precio vigente de un sector, ya con reglas y eventos aplicados. */
@@ -111,6 +113,8 @@ export interface Cotizacion {
   sena: number;
   /** Lo que queda para pagar al salir si paga solo la seña. */
   saldo: number;
+  /** Si el lugar es de un abonado que lo cedió: hasta cuándo (ISO). La estadía no puede pasarse de esa hora. */
+  cedidoHasta?: string;
 }
 
 /** Cómo se completa el pago con cada medio. */
@@ -196,4 +200,42 @@ export interface UsuarioSesion {
   rol: "conductor";
   /** Última patente usada, para completar el checkout. */
   patente?: string;
+  /** Tiene un abono mensual en algún estacionamiento con el subalquiler habilitado ("Mi abono"). */
+  abonado?: boolean;
+}
+
+/** Estado de una franja cedida, según la hora actual. */
+export type EstadoCesion = "proxima" | "en_curso" | "terminada";
+
+/** Una franja en la que el abonado cede su lugar. */
+export interface CesionAbono {
+  id: string;
+  /** ISO. */
+  desde: string;
+  hasta: string;
+  estado: EstadoCesion;
+  /** Reservas de otros conductores en esa franja (pagadas o por pagar). */
+  reservas: number;
+  /** Lo que cobró el estacionamiento por el lugar en esa franja. */
+  cobrado: number;
+  /** Lo que le corresponde al abonado (su % de lo cobrado). */
+  ganado: number;
+}
+
+/** Un abono mensual del conductor, visto desde "Mi abono". */
+export interface MiAbono {
+  estacionamiento: Pick<EstacionamientoResumen, "id" | "nombre" | "direccion">;
+  plazaId: string;
+  /** "A-10". */
+  plazaEtiqueta: string;
+  sectorNombre: string;
+  pisoNombre: string;
+  /** Fecha ISO (YYYY-MM-DD). */
+  vence: string;
+  precio: number;
+  /** Crédito por ceder el lugar que se descuenta del próximo pago. */
+  credito: number;
+  /** % de lo cobrado que se lleva el abonado (lo define el gestor). */
+  pctAbonado: number;
+  cesiones: CesionAbono[];
 }

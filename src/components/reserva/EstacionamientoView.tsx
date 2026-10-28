@@ -26,8 +26,11 @@ export function EstacionamientoView({ id }: { id: string }) {
   const router = useRouter();
   const r = useReserva();
   const { vehiculo, desde, hasta, listo } = r;
-  // Los precios dependen de la hora de llegada (reglas horarias y eventos): se piden para ese momento.
-  const { data: est, error, cargando } = useCarga(listo ? () => estacionamientosService.detalle(id, vehiculo, desde) : null, [listo, id, vehiculo, desde], { cadaMs: 20000 });
+  // Los precios dependen de la hora de llegada (reglas horarias y eventos) y los lugares cedidos por abonados
+  // del horario completo: se piden para ese momento.
+  const { data: est, error, cargando } = useCarga(listo ? () => estacionamientosService.detalle(id, vehiculo, desde, hasta) : null, [listo, id, vehiculo, desde, hasta], {
+    cadaMs: 20000,
+  });
   const plazaId = r.seleccion?.estacionamientoId === id ? r.seleccion.plazaId : null;
   const [pisoId, setPisoId] = useState<string | null>(null);
   const { cot, error: errCot, cargando: cotizando } = useCotizacion(plazaId ? id : null, plazaId, vehiculo, desde, hasta);
@@ -44,7 +47,7 @@ export function EstacionamientoView({ id }: { id: string }) {
     const info = datosPlaza(plano, plazaId);
     const p = plano.plazas[plazaId];
     if (!info || !p || !plazaElegible(p, info.sector, vehiculo)) {
-      toast.warning("El lugar que elegiste se acaba de ocupar. Elegí otro.");
+      toast.warning(plano.plazas[plazaId]?.estado === "no_disponible" ? "El lugar que elegiste no está libre en ese horario. Elegí otro." : "El lugar que elegiste se acaba de ocupar. Elegí otro.");
       r.limpiarSeleccion();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

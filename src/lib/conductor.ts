@@ -1,6 +1,6 @@
 /** Helpers puros de la app del conductor: distancias, disponibilidad, horarios y elección de plaza. */
 import type { ClaseVehiculo, Sector } from "@/lib/types";
-import type { EstadoDisponibilidad, EstadoReserva, PlanoPublico, PlazaPublica, Servicio, TarifaSector, Ubicacion } from "@/lib/conductor.types";
+import type { EstadoCesion, EstadoDisponibilidad, EstadoReserva, PlanoPublico, PlazaPublica, Servicio, TarifaSector, Ubicacion } from "@/lib/conductor.types";
 import type { PillTone } from "@/components/common/CommonPill";
 import type { NombreIcono } from "@/lib/iconos";
 import { ars } from "@/lib/format";
@@ -48,6 +48,12 @@ export const ESTADOS_RESERVA: Record<EstadoReserva, { label: string; tone: PillT
   finalizada: { label: "Finalizada", tone: "neutral", icon: "check" },
   cancelada: { label: "Cancelada", tone: "neutral", icon: "cerrar" },
   vencida: { label: "Vencida", tone: "danger", icon: "alerta" },
+};
+
+export const ESTADOS_CESION: Record<EstadoCesion, { label: string; tone: PillTone; icon: NombreIcono }> = {
+  proxima: { label: "Próxima", tone: "sky", icon: "calendario" },
+  en_curso: { label: "Cedido ahora", tone: "brand", icon: "check" },
+  terminada: { label: "Terminada", tone: "neutral", icon: "reloj" },
 };
 
 export const SERVICIOS: Record<Servicio, { label: string; icon: NombreIcono }> = {

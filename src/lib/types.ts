@@ -17,10 +17,42 @@ export type ModoRegla = "pct" | "hora" | "unica";
 export type TipoRegla = "horario" | "evento";
 export type TipoMovimiento = "ingreso" | "cobro" | "egreso";
 
+/**
+ * Franja en la que el abonado no va a usar su plaza y la cede para que se alquile (subalquiler).
+ * Una franja es de un solo día: para varios días se cargan varias.
+ */
+export interface Cesion {
+  id: string;
+  /** Fecha ISO (YYYY-MM-DD). */
+  fecha: string;
+  /** Minuto del día en que empieza (0-1439). */
+  desde: number;
+  /** Minuto del día en que termina; siempre mayor que `desde`. */
+  hasta: number;
+  /** Lo que lleva cobrado el estacionamiento por esta franja (antes de repartir). */
+  cobrado?: number;
+}
+
 export interface Abono {
   /** Fecha ISO (YYYY-MM-DD) en que vence el abono. */
   vence: string;
   precio: number;
+  /** Id del usuario de la app del conductor, si el abonado tiene cuenta. */
+  usuarioId?: string;
+  /** Franjas cedidas (solo con el subalquiler habilitado por el gestor). */
+  cesiones?: Cesion[];
+  /** Lo que ganó el abonado por ceder su plaza y todavía no se le descontó (en $). Va al próximo pago. */
+  credito?: number;
+}
+
+/** Datos del abonado mientras otro vehículo usa su plaza durante una cesión. */
+export interface PlazaCedida {
+  cesionId: string;
+  /** Minuto del día en que termina la cesión: a esa hora el abonado puede volver. */
+  hasta: number;
+  patente?: string;
+  cliente?: string;
+  vehiculo?: ClaseVehiculo;
 }
 
 /** Precio que quedó fijado al momento del ingreso: si después cambia la tarifa, no afecta. */
@@ -54,6 +86,11 @@ export interface Plaza {
   cobro?: CobroFijado;
   /** Seña cobrada al reservar (en $). Se descuenta al cobrar la salida y no se devuelve si se libera. */
   sena?: number;
+  /**
+   * Plaza de un abonado que la está usando otro durante una cesión. Mientras tanto patente, cliente,
+   * vehículo, `desde` y `cobro` son los del que entró; acá quedan los del abonado para devolvérsela.
+   */
+  cedida?: PlazaCedida;
 }
 
 /** Nivel del edificio (planta baja, piso 1, subsuelo…). Todos comparten las medidas del galpón. */
@@ -157,6 +194,14 @@ export interface Movimiento {
 export interface Configuracion {
   /** % de la estadía reservada que se cobra como seña al reservar (0 a 100; 0 = sin seña). */
   senaPct: number;
+  /** Subalquiler de abonos: el abonado cede su plaza en las horas que no la usa. Sin valor = deshabilitado. */
+  subalquiler?: Subalquiler;
+}
+
+export interface Subalquiler {
+  habilitado: boolean;
+  /** % de lo cobrado por una plaza cedida que se lleva el abonado (0 a 100). */
+  pctAbonado: number;
 }
 
 export interface Turno {

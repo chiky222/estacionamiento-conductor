@@ -57,6 +57,11 @@ export function ResumenSeleccion({ est, plazaId, cot, cargando, error, desde, ha
           Cambiar
         </CommonButton>
       </div>
+      {cot?.cedidoHasta && (
+        <CommonPill tone="amber" icon="abono" size="sm" className="w-fit">
+          Lugar de un abonado · libre hasta {horaDe(cot.cedidoHasta)}
+        </CommonPill>
+      )}
       {info.tipo !== "std" && (
         <CommonPill tone="sky" icon={info.tipo === "pmr" ? "accesible" : "cargador"} size="sm" className="w-fit">
           {TIPOS_PLAZA.find((t) => t.value === info.tipo)?.label}

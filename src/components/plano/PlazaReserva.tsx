@@ -60,7 +60,8 @@ export function PlazaReserva({ sector: s, plaza: p, vehiculo, seleccionada, onEl
   }
 
   const accion = elegible && onElegir ? () => onElegir(p.id) : undefined;
-  const estadoTexto = seleccionada ? "elegido" : elegible ? "libre" : p.estado === "libre" ? "no entra tu vehículo" : "no disponible";
+  const estadoTexto =
+    (seleccionada ? "elegido" : elegible ? "libre" : p.estado === "libre" ? "no entra tu vehículo" : "no disponible") + (p.deAbonado ? ", lugar de un abonado" : "");
 
   return (
     <g
@@ -116,6 +117,13 @@ export function PlazaReserva({ sector: s, plaza: p, vehiculo, seleccionada, onEl
           {codigo}
         </text>
       </g>
+      {/* Lugar de un abonado que lo cedió en ese horario: marca chica, como el abono en el tablero. */}
+      {p.deAbonado && !moto && (
+        <g pointerEvents="none">
+          <circle cx={x + w - 9} cy={y + h - 10} r={7.5} style={{ fill: "var(--amber)" }} />
+          <CommonIconSvg name="abono" x={x + w - 14.5} y={y + h - 15.5} size={11} color="var(--on-amber)" strokeWidth={2.25} />
+        </g>
+      )}
       {seleccionada && <rect x={x - 1} y={y - 1} width={w + 2} height={h + 2} rx={6} pointerEvents="none" style={{ fill: "none", stroke: "var(--focus)", strokeWidth: 3 }} />}
     </g>
   );
