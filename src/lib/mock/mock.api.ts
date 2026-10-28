@@ -26,11 +26,12 @@ import { cesionQueCubre, cesionSuperpuesta, parteAbonado, subalquilerDe, subalqu
 import { etiquetaPlaza, parseIdPlaza, plazaVacia, recorrerPlazas, vehiculosPermitidos } from "@/lib/plano";
 import { costoEntre, eventosActivos, senaDeReserva, tarifaDeSector, tarifaEn } from "@/lib/tarifas";
 import { normalizarPatente } from "@/lib/patente";
+import { emailValido, normalizarEmail } from "@/lib/email";
 import { distanciaM, estadoDisponibilidad } from "@/lib/conductor";
 import { CENTRO_DEMO, estacionamientosDeEjemplo, type EstacionamientoMock } from "@/lib/mock/mock.seed";
 
-// v2: datos con subalquiler de abonos (cesiones de ejemplo en el Galpón Central).
-const CLAVE = "conductor-mock-v2";
+// v3: abonos con email e invitación (A-07 pendiente para vsosa@ejemplo.com, A-10 vinculado al usuario demo).
+const CLAVE = "conductor-mock-v3";
 const LATENCIA_MS = 220;
 /** Minutos que se retiene el lugar mientras se completa un pago externo. */
 const RETENCION_MIN = 10;
@@ -361,6 +362,20 @@ function abonosDe(usuarioId: string) {
   return out;
 }
 
+/**
+ * Al ingresar o registrarse: los abonos con invitación pendiente para ese email (sin distinguir mayúsculas)
+ * quedan vinculados a la cuenta. En el back real además se marca usado el token de la invitación.
+ */
+function vincularAbonos(usuarioId: string, email: string) {
+  cargar().estacionamientos.forEach((e) =>
+    Object.values(e.datos.plazas).forEach((p) => {
+      if (!p.abono?.email || p.abono.usuarioId || normalizarEmail(p.abono.email) !== email) return;
+      p.abono.usuarioId = usuarioId;
+      p.abono.invitacion = { estado: "aceptada", enviadaEn: p.abono.invitacion?.enviadaEn ?? new Date().toISOString() };
+    }),
+  );
+}
+
 const conAbonado = (u: UsuarioSesion | null) => (u ? { ...u, abonado: abonosDe(u.id).length > 0 } : null);
 
 function miAbono({ e, s, p }: { e: EstacionamientoMock; s: Sector; p: Plaza }): MiAbono {
@@ -410,10 +425,14 @@ const rutas: Ruta[] = [
     metodo: "POST",
     patron: /^\/api\/sesion\/(login|registro|google-demo)$/,
     h: (_, b) => {
-      const email = String(b.email ?? "conductor@ejemplo.com").trim();
-      if (!/^\S+@\S+\.\S+$/.test(email)) throw err(400, "INVALID_ARGUMENT");
+      const email = normalizarEmail(String(b.email ?? "conductor@ejemplo.com"));
+      if (!emailValido(email)) throw err(400, "INVALID_ARGUMENT");
       const nombre = String(b.nombre || email.split("@")[0]);
-      cargar().usuario = { id: "u-demo", nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1), email, rol: "conductor", patente: cargar().usuario?.patente };
+      // Un id por email (el de "Continuar con Google" es el usuario demo), así cada cuenta ve lo suyo.
+      const id = email === "cris@ejemplo.com" ? "u-demo" : "u-" + email.replace(/[^a-z0-9]+/g, "-");
+      const anterior = cargar().usuario;
+      cargar().usuario = { id, nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1), email, rol: "conductor", patente: anterior?.id === id ? anterior.patente : undefined };
+      vincularAbonos(id, email);
       return conAbonado(cargar().usuario);
     },
   },

@@ -40,6 +40,10 @@ Lo pagado online queda en `plaza.sena` del tablero, así el cobro de salida lo d
 
 **Tolerancia:** el lugar se guarda `toleranciaMin` después de la hora de llegada; después la reserva vence.
 
+## Cuenta del abonado
+
+El abono de una plaza se identifica con la cuenta (`abono.usuarioId`), nunca con la patente. El gestor lo asocia por email con una invitación (ver el DOMAIN_MODEL del tablero): al registrarse o ingresar con ese email, los abonos pendientes de ese email quedan vinculados. Sin abonos vinculados, "Mi abono" no aparece.
+
 ## Subalquiler de abonos ("Mi abono")
 
 Lo habilita el gestor (`configuracion.subalquiler` del tablero; ver su DOMAIN_MODEL). Deshabilitado, no aparece nada.

@@ -100,10 +100,19 @@ export function datosDeEjemplo(): DatosTablero {
         if (i < 16) {
           p.abono = { vence: isoFecha(sumarDias(HOY, i === 3 ? -6 : i === 11 ? -2 : 5 + i * 2)), precio: 120000 };
           // Lugares cedidos (subalquiler): A-07 está cedido hoy y A-10 es del usuario de la app del conductor.
-          if (i === 6) p.abono.cesiones = [{ id: "c-a07-hoy", fecha: isoFecha(HOY), desde: 480, hasta: 1439 }];
+          // A-07: invitación pendiente (se vincula entrando a la app del conductor con ese email).
+          if (i === 6)
+            Object.assign(p.abono, {
+              email: "vsosa@ejemplo.com",
+              invitacion: { estado: "pendiente", enviadaEn: sumarDias(HOY, -3).toISOString() },
+              cesiones: [{ id: "c-a07-hoy", fecha: isoFecha(HOY), desde: 480, hasta: 1439 }],
+            });
+          // A-10: ya vinculado al usuario demo ("Continuar con Google" en la API simulada).
           if (i === 9)
             Object.assign(p.abono, {
+              email: "cris@ejemplo.com",
               usuarioId: "u-demo",
+              invitacion: { estado: "aceptada", enviadaEn: sumarDias(HOY, -20).toISOString() },
               credito: 8400,
               cesiones: [
                 { id: "c-a10-ayer", fecha: isoFecha(sumarDias(HOY, -1)), desde: 540, hasta: 1080, cobrado: 16800 },

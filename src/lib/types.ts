@@ -37,12 +37,26 @@ export interface Abono {
   /** Fecha ISO (YYYY-MM-DD) en que vence el abono. */
   vence: string;
   precio: number;
-  /** Id del usuario de la app del conductor, si el abonado tiene cuenta. */
+  /**
+   * Email del abonado: con él se lo invita a la app del conductor y se vincula su cuenta.
+   * Opcional solo por datos viejos; las altas nuevas lo piden.
+   */
+  email?: string;
+  /** Cuenta de la app del conductor vinculada. Identifica al abonado (no la patente, que puede cambiar). */
   usuarioId?: string;
+  invitacion?: InvitacionAbono;
   /** Franjas cedidas (solo con el subalquiler habilitado por el gestor). */
   cesiones?: Cesion[];
   /** Lo que ganó el abonado por ceder su plaza y todavía no se le descontó (en $). Va al próximo pago. */
   credito?: number;
+}
+
+/** Invitación a la app del conductor que se manda al email del abonado. */
+export interface InvitacionAbono {
+  /** "pendiente" hasta que el abonado entra con ese email; después "aceptada" (y el abono tiene `usuarioId`). */
+  estado: "pendiente" | "aceptada";
+  /** ISO del último envío. */
+  enviadaEn: string;
 }
 
 /** Datos del abonado mientras otro vehículo usa su plaza durante una cesión. */

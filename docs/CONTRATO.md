@@ -144,6 +144,8 @@ Passport local + Google, JWT en cookie httpOnly firmada, rol `conductor` (distin
 | GET | `/api/sesion/google?volver=/checkout` | — | Redirige a Google y, al volver, a `volver` (solo rutas internas) |
 | POST | `/api/sesion/logout` | — | `{ ok: true }` |
 
+**Invitación de abonado:** al registrarse o ingresar (email, Google o el link de la invitación), el back busca abonos con `invitacion.estado = "pendiente"` y el mismo email (sin distinguir mayúsculas), les pone `usuarioId` y los marca `aceptada`. El link del mail es `/invitacion?token=…`: un token de un solo uso con vencimiento que lleva al registro con el email precargado. `GET /api/invitaciones/:token` → `{ email, estacionamiento, plazaEtiqueta }`; 410 `INVITACION_VENCIDA` si venció o ya se usó.
+
 `UsuarioSesion = { id, nombre, email, rol: "conductor", patente?, abonado? }`. `abonado: true` si tiene un abono (`plaza.abono.usuarioId`) en un estacionamiento con el subalquiler habilitado: muestra "Mi abono". `patente` = la última que usó (para completar el checkout). Nunca devolver hash de contraseña ni tokens.
 
 ## Reservas (`onlyLogged`, rol conductor)
@@ -335,7 +337,7 @@ Hoy el front refresca cada 20-30 s (`useCarga` con `cadaMs`). Con Socket.io:
 
 ## Códigos de error nuevos
 
-`PLAZA_NO_DISPONIBLE` 409 · `SOLD_OUT` 409 · `ESTACIONAMIENTO_CERRADO` 409 · `HORARIO_INVALIDO` 400 · `MEDIO_PAGO_INVALIDO` 400 · `PAGO_RECHAZADO` 409 · `PAGO_YA_PROCESADO` 409 · `RESERVA_NO_CANCELABLE` 409 · `RESERVA_VENCIDA` 409 · `FUERA_DE_CESION` 409 · `SUBALQUILER_DESHABILITADO` 409 · `CESION_INVALIDA` 400 · `CESION_SUPERPUESTA` 409 · `CESION_CON_RESERVAS` 409 · `PLAZA_CEDIDA` 409. Más los del tablero que también se usan acá: `INVALID_ARGUMENT`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `PATENTE_INVALIDA`, `VEHICULO_NO_ENTRA`, `INTERNAL_ERROR`.
+`PLAZA_NO_DISPONIBLE` 409 · `SOLD_OUT` 409 · `ESTACIONAMIENTO_CERRADO` 409 · `HORARIO_INVALIDO` 400 · `MEDIO_PAGO_INVALIDO` 400 · `PAGO_RECHAZADO` 409 · `PAGO_YA_PROCESADO` 409 · `RESERVA_NO_CANCELABLE` 409 · `RESERVA_VENCIDA` 409 · `FUERA_DE_CESION` 409 · `INVITACION_VENCIDA` 410 · `EMAIL_INVALIDO` 400 · `SUBALQUILER_DESHABILITADO` 409 · `CESION_INVALIDA` 400 · `CESION_SUPERPUESTA` 409 · `CESION_CON_RESERVAS` 409 · `PLAZA_CEDIDA` 409. Más los del tablero que también se usan acá: `INVALID_ARGUMENT`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `PATENTE_INVALIDA`, `VEHICULO_NO_ENTRA`, `INTERNAL_ERROR`.
 
 ## Variables de entorno nuevas del back
 
