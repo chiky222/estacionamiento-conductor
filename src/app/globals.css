@@ -1,0 +1,361 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Tokens del design system ESTACIONARTE (petróleo = marca, coral = dinero, ámbar = reserva y abono,
+ * cielo = servicios). Los valores salen de su tokens.json. Debajo, los nombres shadcn (primary, muted…)
+ * y los de dominio del plano (floor, sector-N, ramp-N…) apuntan a esos tokens.
+ */
+:root {
+  /* ---------- ESTACIONARTE ---------- */
+  --surface: #f4f7f5;
+  --surface-raised: #ffffff;
+  --surface-sunken: #e9efec;
+  --surface-glass: rgba(255, 255, 255, 0.72);
+  --line: #dce5e1;
+  --line-strong: #71857e;
+  --ink: #10241f;
+  --ink-muted: #5a6e68;
+  --brand: #0e7c66;
+  --brand-strong: #0b6654;
+  --brand-soft: #daf2ea;
+  --on-brand: #ffffff;
+  --coral: #c8482c;
+  --coral-soft: #ffe6dd;
+  --coral-text: #a93a22;
+  --on-coral: #ffffff;
+  --coral-bright: #f08a6e;
+  --amber: #d99a2b;
+  --amber-soft: #fff1d6;
+  --amber-text: #8a5a00;
+  /* Tinta sobre un relleno ámbar (insignias de abono y carga); igual en ambos temas. */
+  --on-amber: #10241f;
+  --sky: #285f92;
+  --sky-soft: #dfedf9;
+  --danger: #b3261e;
+  --danger-soft: #fde8e6;
+  --blocked: #8a9893;
+  --asphalt: #e6ece9;
+  --lane-mark: #d9a53a;
+  --map-wall: #c9d4cf;
+  --paint-teal: #1e9c80;
+  --paint-coral: #f08a6e;
+  --paint-sand: #e3c79c;
+  --paint-slate: #4b5d63;
+  --paint-white: #fbfcfb;
+  --glass: #1f3b42;
+  --plate-bg: #ffffff;
+  --plate-band: #1f4e9c;
+  --plate-ink: #10241f;
+  --grad-mint: #cfede2;
+  --grad-peach: #fbdccb;
+  --focus: #0b6654;
+  --scrim: rgba(16, 36, 31, 0.4);
+  --shadow-1: 0 1px 2px rgba(16, 36, 31, 0.06), 0 6px 16px rgba(16, 36, 31, 0.06);
+  --shadow-2: 0 2px 6px rgba(16, 36, 31, 0.08), 0 20px 40px rgba(16, 36, 31, 0.12);
+  --shadow-brand: 0 8px 20px rgba(14, 124, 102, 0.28);
+  --shadow-coral: 0 8px 20px rgba(200, 72, 44, 0.28);
+
+  /* ---------- Plano: grilla y sectores ---------- */
+  --grid: #dce4e0;
+  --grid-strong: #cad5d0;
+  --grid-dot: #a9b8b2;
+  --sector-0: #6a4fc9;
+  --sector-1: #2f68b0;
+  --sector-2: #a3478f;
+  --sector-3: #5e7a1f;
+  --sector-4: #8a5a3b;
+  --sector-5: #4b5d63;
+  --on-sector: #ffffff;
+
+  /* Rampa de tiempo (cielo) para la capa Permanencia. */
+  --ramp-1: #e6f0fa;
+  --ramp-1-fg: #10241f;
+  --ramp-2: #c3dbf2;
+  --ramp-2-fg: #10241f;
+  --ramp-3: #8fbbe6;
+  --ramp-3-fg: #10241f;
+  --ramp-4: #3f78b3;
+  --ramp-4-fg: #ffffff;
+  --ramp-5: #285f92;
+  --ramp-5-fg: #ffffff;
+  /* Rampa de dinero (coral) para la capa Tarifa. */
+  --ramp-m-1: #fff0ea;
+  --ramp-m-1-fg: #10241f;
+  --ramp-m-2: #ffd9cb;
+  --ramp-m-2-fg: #10241f;
+  --ramp-m-3: #f7b39c;
+  --ramp-m-3-fg: #10241f;
+  --ramp-m-4: #e07457;
+  --ramp-m-4-fg: #10241f;
+  --ramp-m-5: #b8402a;
+  --ramp-m-5-fg: #ffffff;
+
+  /* Mapa de muestra de la app del conductor (cuando no hay API key de Google Maps). */
+  --map-land: #e8eeea;
+  --map-block: #dde6e1;
+  --map-street: #fbfcfb;
+  --map-avenue: #f4dfae;
+  --map-avenue-edge: #e3c79c;
+  --map-park: #c8e6cf;
+  --map-rail: #b7c3be;
+  --map-label: #5a6e68;
+  --map-me: #285f92;
+}
+
+.dark {
+  --surface: #0e1715;
+  --surface-raised: #16221f;
+  --surface-sunken: #0a1210;
+  --surface-glass: rgba(22, 34, 31, 0.72);
+  --line: #2a3935;
+  --line-strong: #7c918a;
+  --ink: #e8f1ee;
+  --ink-muted: #9db2ab;
+  --brand: #34c9a6;
+  --brand-strong: #5ee0c0;
+  --brand-soft: #12352d;
+  --on-brand: #062520;
+  --coral: #ff8a6b;
+  --coral-soft: #3d1b12;
+  --coral-text: #ff9c80;
+  --on-coral: #2b0f07;
+  --coral-bright: #f08a6e;
+  --amber: #f5b94a;
+  --amber-soft: #3a2a0c;
+  --amber-text: #f5b94a;
+  --sky: #7db5e8;
+  --sky-soft: #13283b;
+  --danger: #ff8a80;
+  --danger-soft: #3a1512;
+  --blocked: #56645f;
+  --asphalt: #1a2623;
+  --lane-mark: #c99a3a;
+  --map-wall: #30403b;
+  --paint-teal: #1e9c80;
+  --paint-coral: #f08a6e;
+  --paint-sand: #e3c79c;
+  --paint-slate: #6b7f86;
+  --paint-white: #d9e2df;
+  --glass: #0b1a1e;
+  --grad-mint: #123a31;
+  --grad-peach: #3a2219;
+  --focus: #5ee0c0;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.5), 0 20px 40px rgba(0, 0, 0, 0.45);
+  --shadow-brand: 0 8px 20px rgba(52, 201, 166, 0.2);
+  --shadow-coral: 0 8px 20px rgba(255, 138, 107, 0.2);
+
+  --grid: #1f2c29;
+  --grid-strong: #283733;
+  --grid-dot: #3d4f4a;
+  --sector-0: #a08cf0;
+  --sector-1: #7fb0ec;
+  --sector-2: #e28fcf;
+  --sector-3: #a9c25a;
+  --sector-4: #d4a07e;
+  --sector-5: #9fb3ba;
+  --on-sector: #0e1715;
+
+  --ramp-1: #13283b;
+  --ramp-1-fg: #e8f1ee;
+  --ramp-2: #1d3f5e;
+  --ramp-2-fg: #e8f1ee;
+  --ramp-3: #2d5f8a;
+  --ramp-3-fg: #e8f1ee;
+  --ramp-4: #5d97cf;
+  --ramp-4-fg: #0e1715;
+  --ramp-5: #9cc8f0;
+  --ramp-5-fg: #0e1715;
+  --ramp-m-1: #2e160f;
+  --ramp-m-1-fg: #e8f1ee;
+  --ramp-m-2: #4a2318;
+  --ramp-m-2-fg: #e8f1ee;
+  --ramp-m-3: #7a3826;
+  --ramp-m-3-fg: #e8f1ee;
+  --ramp-m-4: #d9694c;
+  --ramp-m-4-fg: #0e1715;
+  --ramp-m-5: #ff9c80;
+  --ramp-m-5-fg: #0e1715;
+
+  --map-land: #111c1a;
+  --map-block: #16231f;
+  --map-street: #24332f;
+  --map-avenue: #4a3f26;
+  --map-avenue-edge: #5d4f2e;
+  --map-park: #173326;
+  --map-rail: #33433e;
+  --map-label: #9db2ab;
+  --map-me: #7db5e8;
+}
+
+/* Alias shadcn y de dominio: siempre apuntan a un token de ESTACIONARTE. */
+:root,
+.dark {
+  --background: var(--surface);
+  --foreground: var(--ink);
+  --card: var(--surface-raised);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--ink);
+  --muted: var(--surface-sunken);
+  --muted-foreground: var(--ink-muted);
+  --faint: var(--ink-muted);
+  --border: var(--line);
+  --border-soft: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--focus);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-brand);
+  --primary-soft: var(--brand-soft);
+  --secondary: var(--surface-sunken);
+  --secondary-foreground: var(--ink);
+  --accent: var(--brand-soft);
+  --accent-foreground: var(--brand-strong);
+  --destructive: var(--danger);
+  --destructive-soft: var(--danger-soft);
+  --ok: var(--brand-strong);
+  --ok-soft: var(--brand-soft);
+  --warn: var(--amber-text);
+  --warn-soft: var(--amber-soft);
+
+  --floor: var(--asphalt);
+  --wall: var(--map-wall);
+  --paint: var(--line-strong);
+  --dim: var(--ink-muted);
+  --flow: var(--lane-mark);
+}
+
+@theme inline {
+  --font-sans: var(--font-figtree), "Avenir Next", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, Menlo, monospace;
+  --font-display: var(--font-sora), "Avenir Next", system-ui, sans-serif;
+
+  /* Radios de ESTACIONARTE: xs cajones y patentes, sm campos, md botones, lg tarjetas. */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  --shadow-e1: var(--shadow-1);
+  --shadow-e2: var(--shadow-2);
+  --shadow-brand: var(--shadow-brand);
+  --shadow-coral: var(--shadow-coral);
+
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-glass: var(--surface-glass);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-on-brand: var(--on-brand);
+  --color-coral: var(--coral);
+  --color-coral-soft: var(--coral-soft);
+  --color-coral-text: var(--coral-text);
+  --color-on-coral: var(--on-coral);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-amber-text: var(--amber-text);
+  --color-on-amber: var(--on-amber);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-blocked: var(--blocked);
+  --color-focus: var(--focus);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-grid-strong: var(--grid-strong);
+  --color-on-sector: var(--on-sector);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    font-size: 15px;
+    line-height: 22px;
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Recorrido animado de los vehículos en el plano. */
+@keyframes flujo {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+.plano-flujo {
+  animation: flujo 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .plano-flujo {
+    animation: none;
+  }
+}
+
+/* Halo del punto "estás acá" en el mapa. */
+@keyframes pulso-ubicacion {
+  from {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+.mapa-pulso {
+  animation: pulso-ubicacion 2s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mapa-pulso {
+    animation: none;
+  }
+}
